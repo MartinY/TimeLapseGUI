@@ -1,4 +1,3 @@
-from inspect import isroutine
 import os
 import sys
 from time import time, sleep, mktime
@@ -51,15 +50,12 @@ camera.framerate = 15
 camera.start_preview()
 #camera.image_effect = 'negative'
 sleep(2)
-logging.info('Camara iniciada')
+logging.info('Camera started')
 
 finalPath = PATH + '/timelapse_' + datetime.now().strftime('%Y%m%d')
 if not os.path.exists(finalPath):
     logging.info("Folder created: {}".format(finalPath))
     os.makedirs(finalPath)
-
-text = ""
-timeTillDestroy = 10
 
 isRunning = False
 
@@ -78,9 +74,9 @@ def startTimeLapse():
     #hours_added = timedelta(hours = HORAS)
     hoursToAdd = timedelta(minutes = MINUTES)
     futureDateTime = currentDateTime + hoursToAdd
-    logging.info("Fecha fin:\t{}".format(futureDateTime))
+    logging.info("End date:\t{}".format(futureDateTime))
 
-    logging.info("")
+    #logging.info("")
     logging.info("Number of pictures:\t{:d}".format(int(MINUTES*(60/PERIOD))))
 
     nextTime = mktime(currentDateTime.timetuple())
@@ -124,14 +120,14 @@ def startTimeLapse():
             sleep(sleepTime)
 
     logging.info("Finish TimeLapse")
+    isRunning = False
 
     return
 
 def stopTimeLapse():
     global isRunning
     isRunning = False
-    text = 'stoptimelapse'
-    print(text)
+    print('stoptimelapse')
     return
 
 def exitTimeLapse():
@@ -143,6 +139,7 @@ def exitTimeLapse():
         mainWindow.destroy()
         camera.stop_preview()
         camera.close()
+        logging.info('Camera stoped')
     return
 
 def aboutTimeLapse():
@@ -152,7 +149,7 @@ codePath = os.path.dirname(__file__)
 
 mainWindow = Tk()
 mainWindow.title('TimeLapseGUI')
-mainWindow.iconphoto(False, PhotoImage(file = f'{codePath}\camera_small.png'))
+#mainWindow.iconphoto(False, PhotoImage(file = f'{codePath}/camera_small.png'))
 #mainWindow.geometry('400x200')
 mainWindow.resizable(width = False, height = False)
 mainWindow.protocol("WM_DELETE_WINDOW", exitTimeLapse)
