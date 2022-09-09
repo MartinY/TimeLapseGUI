@@ -3,6 +3,7 @@ import sys
 from time import time, sleep, mktime
 from datetime import datetime, timedelta
 import logging
+import socket
 from tkinter import *
 from tkinter import messagebox
 from picamera import PiCamera, Color
@@ -10,12 +11,15 @@ from picamera import PiCamera, Color
 HOURS = 5 # tiempo de ejecucion total
 MINUTES = HOURS * 60
 MINUTES = 1
-PERIOD = 15 # tiempo entre cada foto en segundos
 PATH = '/home/pi/Pictures'
 #LOG_FORMAT = '[%(asctime)s][%(levelname)-5s] %(name) 15s: %(message)s'
 LOG_FORMAT = '[%(asctime)s][%(levelname)-5s]: %(message)s'
 
 logFileName = PATH + '/timelapse_' + datetime.now().strftime('%Y%m%d') + '.log'
+
+logFileExist = False
+if os.path.exists(logFileName):
+    logFileExist = True  
 
 logging.basicConfig(
     format = LOG_FORMAT,
@@ -42,6 +46,12 @@ consoleHandler.setLevel(logging.INFO)
 #consoleHandler.setFormatter(consoleHandlerFormat)
 logging.getLogger('').addHandler(consoleHandler)
 
+if logFileExist:
+    logging.info('================================================================================')
+
+logging.info("Log file: {}".format(logFileName))
+logging.info("User: {} - Machine: {}".format(os.getlogin(),socket.gethostname()))
+
 camera = PiCamera()
 camera.rotation = 180
 #camera.resolution = (1920, 1080) # 1080p, Full HD, FHD
@@ -52,16 +62,25 @@ camera.start_preview()
 sleep(2)
 logging.info('Camera started')
 
-finalPath = PATH + '/timelapse_' + datetime.now().strftime('%Y%m%d')
-if not os.path.exists(finalPath):
-    logging.info("Folder created: {}".format(finalPath))
-    os.makedirs(finalPath)
-
 isRunning = False
+finalPath = ''
 
 def startTimeLapse():
-    global isRunning
+    global isRunning, finalPath
+
+    strPeriod = period.get()
+    if strPeriod is '':
+        messagebox.showerror('ERROR: Period', 'Period undefined')
+        return
+    else:
+        intPeriod = int(strPeriod)
+
     isRunning = True
+
+    finalPath = PATH + '/timelapse_' + datetime.now().strftime('%Y%m%d')
+    if not os.path.exists(finalPath):
+        logging.info("Folder created: {}".format(finalPath))
+        os.makedirs(finalPath)
 
     logging.info("Starting TimeLapse, until {} hours ({} minutes)".format(HOURS,MINUTES))
 
@@ -77,7 +96,7 @@ def startTimeLapse():
     logging.info("End date:\t{}".format(futureDateTime))
 
     #logging.info("")
-    logging.info("Number of pictures:\t{:d}".format(int(MINUTES*(60/PERIOD))))
+    logging.info("Number of pictures: {:d} - Period: {}".format(int(MINUTES*(60/intPeriod)), intPeriod))
 
     nextTime = mktime(currentDateTime.timetuple())
     sleepTime = nextTime - time()
@@ -113,25 +132,31 @@ def startTimeLapse():
             os.remove(endFile)
             break
 
-        #sleep(PERIODO)
-        nextTime += PERIOD
+        nextTime += intPeriod
         sleepTime = nextTime - time()
         if sleepTime > 0:
             sleep(sleepTime)
 
     logging.info("Finish TimeLapse")
+
     isRunning = False
 
     return
 
 def stopTimeLapse():
-    global isRunning
-    isRunning = False
-    print('stoptimelapse')
+    if isRunning:
+        endFile = finalPath + '/FIN'
+        if not os.path.exists(endFile):
+            with open(endFile, 'a'):
+                os.utime(endFile, None)
+            logging.info("FIN file created: {}".format(endFile))
+        else:
+            messagebox.showinfo("Information", "FIN file already exists: {}".format(endFile))
+    else:
+        messagebox.showinfo("Information", "You can't stop it if it's not running")
     return
 
 def exitTimeLapse():
-    global isRunning
     if isRunning:
         messagebox.showinfo("Information", "You can't get out without stopping first")
     else:
@@ -145,11 +170,18 @@ def exitTimeLapse():
 def aboutTimeLapse():
     messagebox.showinfo("About", "TimeLapseGUI v0.1")
 
+def validateNumber(strNum):
+    if strNum.isdigit() or strNum is '':
+        return True
+    else:
+        return False
+
 codePath = os.path.dirname(__file__)
+iconPath = codePath + '/camera_small.png'
 
 mainWindow = Tk()
 mainWindow.title('TimeLapseGUI')
-#mainWindow.iconphoto(False, PhotoImage(file = f'{codePath}/camera_small.png'))
+mainWindow.iconphoto(False, PhotoImage(file = iconPath))
 #mainWindow.geometry('400x200')
 mainWindow.resizable(width = False, height = False)
 mainWindow.protocol("WM_DELETE_WINDOW", exitTimeLapse)
@@ -162,19 +194,19 @@ filemenu.add_command(label = "Exit", command = exitTimeLapse)
 menubar.add_cascade(label = "File", menu = filemenu)
 #mainWindow.config(menu = menubar)
 
-Button(mainWindow, text = 'Start', command = startTimeLapse, width = 20).grid(row = 0, column = 0)
-Button(mainWindow, text = 'Stop', command = stopTimeLapse, width = 20).grid(row = 0, column = 1)
-Button(mainWindow, text = 'Exit', command = exitTimeLapse, width = 20).grid(row = 1, column = 0, columnspan = 2)
+Label(mainWindow, text = 'Period(s):').grid(row = 0, column = 0, sticky = W)
+period = Entry(mainWindow, width = 5)
+period.insert(0, '15')
+period.grid(row = 0, column = 1, sticky = W)
+validateNumberReg = mainWindow.register(validateNumber)
+period.config(validate = 'key', validatecommand = (validateNumberReg, '%P'))
 
-Label(mainWindow, text = 'Python version:').grid(row = 2, column = 0, sticky = W)
-Label(mainWindow, text = sys.version_info, relief = 'sunken').grid(row = 2, column = 1, sticky = W)
+Button(mainWindow, text = 'Start', command = startTimeLapse, width = 20).grid(row = 1, column = 0)
+Button(mainWindow, text = 'Stop', command = stopTimeLapse, width = 20).grid(row = 1, column = 1)
+Button(mainWindow, text = 'Exit', command = exitTimeLapse, width = 20).grid(row = 2, column = 0, columnspan = 2)
 
-#Label(mainWindow,text=f'Self time out GUI\nGUI will close in {timeTillDestroy} seconds').pack(side=TOP,padx=10,pady=10)
-#Label(mainWindow,text='Or the GUI will time out on input').pack(side=TOP,padx=10,pady=10)
-
-text = ''
-entry = Entry(mainWindow, width = 50)
-#entry.pack(side = TOP, padx = 10, pady = 10)
+Label(mainWindow, text = 'Python version:').grid(row = 3, column = 0, sticky = W)
+Label(mainWindow, text = sys.version_info, relief = 'sunken').grid(row = 3, column = 1, sticky = W)
 
 #mainWindow.after(timeTillDestroy*1000, lambda: mainWindow.destroy()) # Destroy the widget after (time) seconds
 mainWindow.mainloop()
